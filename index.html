@@ -1,0 +1,220 @@
+<html>
+<head>
+<style>
+#time {
+	width: 500px!important;
+}
+</style>
+<script type="text/javascript">
+var podcast;
+function Audio() {
+	var self = this;
+	var timer, listener;
+	if ( ! ( this instanceof Audio ) ) {
+		return new Audio( );
+	}
+	function notify() {
+		self.pause();
+		if ( listener ) {
+			listener();
+		}
+	}
+	self.src = undefined;
+	self.play = function( ) {
+		var fragment = podcast && podcast.fragmentIndex[ self.src ];
+		if ( !fragment ) {
+			return;
+		}
+		if ( !timer ) {
+			timer = window.setTimeout( notify, fragment.length * 100 );
+		}
+	}
+	self.pause = function() {
+		if ( timer ) {
+			window.clearTimeout( timer );
+			timer = undefined;
+		}
+	}
+	self.addEventListener = function( e, l ) {
+		listener = l;
+	}
+	return self;
+}
+
+function argNames( fn ) {
+	return fn.toString().split( /\(\s*/ )[ 1 ].split( /\s*\)/ )[ 0 ].split( /\s*,\s*/g );
+}
+function Fragment( audio, length, description, priority, next ) {
+	var self = this;
+	var argN = argNames( Fragment );
+	if ( ! ( this instanceof Fragment ) ) {
+		return new Fragment( audio, length, description, priority, next );
+	}
+	Array.prototype.slice.apply( arguments ).forEach( (v,i)=>self[ argN[ i ] ]=v );
+	if ( !Array.isArray( self.next ) ) {
+		if ( self.next ) {
+			self.next = [ self.next ];
+		} else {
+			self.next = [ ];
+		}
+	}
+	return self;
+}
+
+
+function Podcast( fragments, playlistChangeListener ) {
+	var self = this;
+	if ( ! ( this instanceof Podcast ) ) {
+		return new Podcast( fragments, playlistChangeListener );
+	}
+	self.fragmentIndex = { };
+	self.playlist = [ ];
+	( self.fragments = fragments ).forEach( (f, i)=>{
+		self.playlist[ i ]=f.audio;
+		self.fragmentIndex[f.audio]=f; } );
+	self.played = 0;
+	self._playlistChange = playlistChangeListener;
+	return self;
+}
+Podcast.prototype.adjust = function( duration ) {
+	var self = this;
+	var priority = 0;
+	var currentLength = self.length( false );
+	var fragmentMap = [ ], it, f;
+	var exiting = false, slicing = [];
+	if ( duration >= currentLength ) {
+		;
+	} else {
+		duration = duration || 0;
+		self.playlist.forEach( function( f, i ) {
+			console.log( ( self.fragmentIndex[ f || "_" ] || { } ).priority || 0, priority );
+			priority = Math.max( ( self.fragmentIndex[ f || "_" ] || { } ).priority || 0, priority );
+			fragmentMap[ priority ] = it = ( fragmentMap[ priority ] || [ ] );
+			it.push( [ f, i ] ); } );
+		priority = fragmentMap.length - 1;
+		while( priority > 0 ) {
+			it = fragmentMap[ priority ] || [ ];
+			while( f = it.pop() ) {
+				currentLength -= ( self.fragmentIndex[ f[ 0 ] || "_" ] || [ ] ).length;
+				slicing.push( f[ 1 ] );
+				if ( duration >= currentLength ) {
+					exiting = true;
+					break;
+				}
+			}
+			if ( exiting ) {
+				break;
+			}
+			priority--;
+		}
+	}
+	if ( slicing.length && self._playlistChange ) {
+		self._playlistChange( self.playlist, slicing );
+	}
+	// TODO: Notify
+}
+Podcast.prototype.length = function( remaining ) {
+	var l = 0, self = this;
+	self.playlist.forEach( ( f )=>( l+= ( ( f && ( f = self.fragmentIndex[ f ] ) &&  f.length ) || 0 )  ) );
+	if ( !remaining ) {
+		l += self.played; 
+	}
+	return l;
+}
+
+function Player( podcast, junctionListener ) {
+	var self = this;
+	if ( ! ( this instanceof Player ) ) {
+		return new Player( podcast, junctionListener );
+	}
+	function increment( playerType ) {
+		self[ playerType ] += 1;
+		if ( self[ playerType ] >= self._players.length ) {
+			self[ playerType ] = 0;
+		}
+	}
+	function continuePlay( beginning ) {
+		var podcast = self._podcast;
+		var currentPlayer;
+		self._players[ self._active ].pause();
+		if ( self.ending ) {
+			return;
+		}
+		if ( !beginning ) {
+			increment( "_active" );
+		}
+		podcast.played += ( podcast.fragmentIndex[ ( podcast && podcast.playlist[ 0 ] ) || "_" ] || [] ).length;
+		podcast.playlist = podcast.playlist.slice( 1 );
+		self._next = self._active;
+		increment( "_next" );
+		( currentPlayer = self._players[ self._active ] ).play();
+		if ( junctionListener ) {
+			junctionListener( ( self._podcast.fragmentIndex[ currentPlayer.fragmentId ] || { } ).next );
+		}
+		if ( !self.ending && !self.preload( ) ) {
+			self.ending = 1;
+		}
+	}
+	self._players = [ Audio(), Audio() ]; 
+		// [ document.getElementById( "player1" ), document.getElementById( "player2" ) ];
+	self._players.forEach( (a)=>{
+		a.volume = 0;
+		a.addEventListener( "ended", continuePlay ) } );
+	self._active = 0;
+	self._next = 1;
+	self._podcast = podcast;
+	self.preload( true );
+	continuePlay( true );
+	return self;
+}
+Player.prototype.preload = function( current ) {
+	var self = this;
+	var podcast = self._podcast;
+	var fragmentId = podcast.playlist[ 0 ];
+	var fragment = fragmentId && podcast.fragmentIndex[ fragmentId ];
+	var player;
+	if ( !fragment ) {
+		return false;
+	} else {
+		( player = self._players[ current ? self._active : self._next ] ).src = fragment.audio;
+		player.fragmentId = fragment.audio;
+	}
+	return true;
+}
+
+function info( el ) {
+	document.getElementById( el ).innerText = 
+		"" + podcast.length( true ) + "\r\n" +
+		"" + podcast.length( false ) + "\r\n" +
+		JSON.stringify( Array.prototype.slice.apply( arguments ).slice( 1 ) );
+}
+
+podcast = Podcast( [ 
+	Fragment( "a", 22.2, "the entry", 0, [ "b", "c" ] ),
+	Fragment( "b", 30.34, "post entry default - optional", 1, [ "a", "c" ] ),
+	Fragment( "c", 20.34, "post entry default - mandatory", 4, [ "d" ] ),
+	Fragment( "d", 20.34, "post second default - optional 1", 1, [ "e" ] ),
+	Fragment( "e", 20.34, "post second default - optional 2", 2, [ "f" ] ) ],
+	info.bind( undefined, "playlist" ) );
+
+console.log( podcast.length() );
+console.log( podcast.fragments );
+
+var player;
+function updateUI() {
+	document.getElementById( "time" ).max = podcast.length();
+	player = Player( podcast, info.bind( undefined, "info" ) );
+}
+
+</script>
+</head>
+<body onload="updateUI()">
+	<input type="range" id="time" onchange="podcast.adjust(this.value)" step="1" min="0" max="1" value="0">
+	<pre id="info">
+	</pre>
+	<pre id="playlist">
+	</pre>
+	<audio id="player1"></audio>
+	<audio id="player2"></audio>
+</body>
+</html>
