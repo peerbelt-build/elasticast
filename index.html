@@ -1,8 +1,18 @@
 <html>
 <head>
 <style>
+.time {
+	width: 500px;
+}
+.time #podcast-time {
+	width: 100%;
+	position: relative;
+	top: 19px;
+	background-color: red;
+}
 #time {
-	width: 500px!important;
+	width: 100%;
+	position: relative;
 }
 </style>
 <script type="text/javascript">
@@ -85,6 +95,7 @@ function Podcast( fragments, playlistChangeListener ) {
 	self._playlistChange = playlistChangeListener;
 	self.junction = self._junction.bind( self, "" );
 	self.fragments.sliceAt = sliceAt;
+	self._external = [ ];
 	return self;
 }
 Podcast.prototype.adjust = function( duration ) {
@@ -122,8 +133,11 @@ Podcast.prototype.adjust = function( duration ) {
 	if ( slicing.length && self._playlistChange ) {
 		( slicing.slice().sort( numCmp ) ).forEach( ( i )=>sliced.unshift( src.splice( i, 1 )[ 0 ] ) );
 	}
-	if ( self.playlist.join( "," ) !== src.join( "," ) ) {
+	if ( ( f = self.playlist.join( "," ) ) !== src.join( "," ) ) {
 		self.playlist = src;
+		if ( self.player && !f ) {
+			self.player._continue( );
+		}
 		self._playlistChange( self, self.playlist, sliced, slicing );
 	}
 }
@@ -142,7 +156,6 @@ Podcast.prototype.playing = function( next ) {
 	var self = this;
 	return self.player.playing( next );
 }
-
 Podcast.prototype.length = function( remaining, source ) {
 	var l = 0, self = this;
 	( source || self.playlist ).forEach( ( f )=>( l+= ( ( f && ( f = self.fragmentIndex[ f ] ) &&  f.length ) || 0 )  ) );
@@ -151,11 +164,26 @@ Podcast.prototype.length = function( remaining, source ) {
 	}
 	return l;
 }
+Podcast.prototype._collectExternal = function( next ) {
+	var self = this;
+	( next || [ ] ).forEach( ( f )=> {
+		if ( ( !self.fragmentIndex[ f ] ) && ( self._external.indexOf( f ) === -1 ) ) {
+			self._external.push( f );
+		}
+	} )
+}
+Podcast.prototype.external = function() {
+	return this._external.slice();
+}
 
-function Player( podcast, junctionListener ) {
+function Player( podcast, autoplay, junctionListener ) {
 	var self = this;
 	if ( ! ( this instanceof Player ) ) {
-		return new Player( podcast, junctionListener );
+		return new Player( podcast, autoplay, junctionListener );
+	}
+	if ( typeof autoplay === "function" ){
+		junctionListener = autoplay;
+		autoplay = false;
 	}
 	function increment( playerType ) {
 		self[ playerType ] += 1;
@@ -165,9 +193,12 @@ function Player( podcast, junctionListener ) {
 	}
 	function continuePlay( beginning ) {
 		var podcast = self._podcast;
-		var currentPlayer;
+		var currentPlayer, next;
 		self._players[ self._active ].pause();
 		if ( self.ending && ( self.ending = !self.preload( ) ) ) {
+			if ( junctionListener ) {
+				junctionListener( self, undefined, podcast.external() );
+			}
 			return;
 		}
 		if ( !beginning ) {
@@ -181,14 +212,16 @@ function Player( podcast, junctionListener ) {
 		if ( !self.ending && !self.preload( ) ) {
 			self.ending = 1;
 		}
+		self._podcast._collectExternal(
+			next = ( self._podcast.junction =
+					 self._podcast._junction.bind(
+						self._podcast, currentPlayer.fragmentId ) )( ) );
 		if ( junctionListener ) {
 			junctionListener( self,
-				currentPlayer.fragmentId, ( 
-				self._podcast.junction =
-					self._podcast._junction.bind(
-						self._podcast, currentPlayer.fragmentId ) )( ) );
+				currentPlayer.fragmentId, next );
 		}
 	}
+	self._continue = continuePlay;
 	self._players = [ Audio(), Audio() ]; 
 		// [ document.getElementById( "player1" ), document.getElementById( "player2" ) ];
 	self._players.forEach( (a)=>{
@@ -200,7 +233,16 @@ function Player( podcast, junctionListener ) {
 	podcast.player = self;
 	self.preload( true );
 	continuePlay( true );
+	if (!autoplay) {
+		self.pause();
+	}
 	return self;
+}
+Player.prototype.pause = function( ) {
+	this._players[ this._active ].pause();
+}
+Player.prototype.play = function( ) {
+	this._players[ this._active ].play();
 }
 Player.prototype.preload = function( current ) {
 	var self = this;
@@ -227,31 +269,39 @@ function info( el, self ) {
 		"" + podcast.length( false ) + "\r\n" +
 		JSON.stringify( Array.prototype.slice.apply( arguments ).slice( 2 ) );
 	if ( el === "playlist" ) {
+		document.getElementById( "podcast-time" ).style.width =
+			"" + ( self.length( false ) /
+					self.length(
+						true, 
+						self.fragments.map( 
+							( f )=>{ return f.audio; } ) ) * 100 || 0 ) + "%";
 		info( "info", self, self.playing(), self.junction() );
 	}
 }
 
 podcast = Podcast( [ 
 	Fragment( "a", 22.2, "the entry", 0, [ "b", "c" ] ),
-	Fragment( "b", 30.34, "post entry default - optional", 1, [ "a", "c" ] ),
-	Fragment( "c", 20.34, "post entry default - mandatory", 0, [ "d" ] ),
-	Fragment( "d", 20.34, "post second default - optional 1", 1, [ "e" ] ),
+	Fragment( "b", 30.34, "post entry default - optional", 1, [ "a", "c", "z" ] ),
+	Fragment( "c", 20.34, "post entry default - mandatory", 0, [ "d", "y" ] ),
+	Fragment( "d", 20.34, "post second default - optional 1", 1, [ "x", "e" ] ),
 	Fragment( "e", 20.34, "post second default - optional 2", 2, [ "f" ] ) ],
 	info.bind( undefined, "playlist" ) );
 
-console.log( podcast.length() );
-console.log( podcast.fragments );
-
 var player;
 function updateUI() {
-	document.getElementById( "time" ).max = Math.ceil( podcast.length() );
+	var time = document.getElementById( "time" )
+	time.value = time.max = Math.ceil( podcast.length() );
 	player = Player( podcast, info.bind( undefined, "info" ) );
+	player.play();
 }
 
 </script>
 </head>
 <body onload="updateUI()">
-	<input type="range" id="time" onchange="podcast.adjust(this.value)" step="1" min="0" max="1" value="0">
+	<div class="time">
+		<div id="podcast-time">&nbsp;</div>
+		<input type="range" id="time" onchange="podcast.adjust(this.value)" step="1" min="0" max="1" value="0">
+	</div>
 	<pre id="info">
 	</pre>
 	<pre id="playlist">
