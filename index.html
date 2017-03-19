@@ -41,6 +41,7 @@ body {
     border-radius: 17px;
     background-color: #f72; 
     color: white;
+    transition: all 0.25s ease;
 }
 #playing:before {
     font: normal normal normal 14px/1 FontAwesome;
@@ -66,10 +67,12 @@ ul {
     list-style-type: none;
     margin: 0;
     padding: 0;
+    transition: all 0.25s ease;
 }
 li {
     display:block;
     cursor: pointer;
+    transition: all 0.25s ease;
 }
 li a {
     display: inline-block;
@@ -223,14 +226,18 @@ function Podcast( fragments, playlistChangeListener ) {
     self._external = [ ];
     return self;
 }
-Podcast.prototype.adjust = function( duration ) {
+Podcast.prototype.adjust = function( duration, fragmentPin ) {
     var self = this;
     var priority = 0;
     var currentLength;
     var fragmentMap = [ ], it, f;
     var exiting = false, src, slicing = [], sliced = [];
     duration = duration || 0;
-    ( src = self.fragments.sliceAt( self.playing() ) ).forEach( function( f, i ) {
+    if ( fragmentPin ) {
+        fragmentPin = ( self.fragments[
+            self.fragments.findIndex( (e)=>{ return e.audio===fragmentPin } ) - 1 ] || { } ).audio || "_";
+    }
+    ( src = self.fragments.sliceAt( fragmentPin || self.playing() ) ).forEach( function( f, i ) {
         priority = ( f.priority || 0 );
         fragmentMap[ priority ] = it = ( fragmentMap[ priority ] || [ ] );
         it.push( [ f.audio, i ] ); } );
@@ -407,6 +414,7 @@ function info( el, self ) {
 
 function onPlaylist( podcast ) {
     var self = podcast;
+    console.log( podcast.playlist );
     document.getElementById( "podcast-time" ).style.width =
     "" + ( self.length( false ) /
             self.length(
@@ -432,13 +440,28 @@ function onFragment( player, current, junction ) {
         }
         if ( f.external ) {
             a.className += " external";
+            a.addEventListener( "click", navigate.bind( f ) );
+        } else {
+            a.addEventListener( "click", adjustList.bind( f ) );
         }
         li.appendChild( a );
         ul.appendChild( li );
     })
 
 }
-
+function adjustList() {
+    var p = podcast;
+    p.adjust(
+        document.getElementById( "time" ).value,
+        this.audio );
+    if ( p && ( p = p.player ) ) {
+        p.preload();
+    }
+}
+function navigate() {
+    var url = this.external;
+    window.open( url, "_external" );
+}
 var fragments = [ 
     Fragment( "a", 22.2, "the entry", 0, [ "b", "c" ] ),
     Fragment( "b", 30.34, "post entry default - optional", 1, [ "a", "c", "z" ] ),
@@ -447,10 +470,10 @@ var fragments = [
     Fragment( "e", 20.34, "post second default - optional 2", 2, [ "f" ] ) ];
 
 var eFragments = [
-    Fragment( "z", 22.2,  "Hotel Volk", 0, [], true ),
-    Fragment( "y", 30.34, "Radiodays Europe hack", 0, [], true ),
-    Fragment( "x", 20.34, "Book your Volk room now", 0, [], true ),
-    Fragment( "f", 20.34, "Join the Radiodays Europe Hack event", 0, [], true ) ];
+    Fragment( "z", 22.2,  "Hotel Volks", 0, [], "https://www.volkshotel.nl/nl" ),
+    Fragment( "y", 30.34, "Radiohack Europe", 0, [], "http://www.radiodayseurope.com/radio-hack-europe" ),
+    Fragment( "x", 20.34, "Book your Volks room", 0, [], "https://www.volkshotel.nl/nl#kamers" ),
+    Fragment( "f", 20.34, "Join the Radiohack event", 0, [], "http://www.radiodayseurope.com/register-now" ) ];
 
 var index = { };
 [ fragments, eFragments ].map( (ar)=>ar.map( (f)=>index[f.audio]=f ) );
