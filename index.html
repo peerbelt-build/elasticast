@@ -1,312 +1,485 @@
 <html>
 <head>
 <style>
-.time {
-	width: 500px;
+body {
+    background-color: white;
+    font-family: Tahoma, Arial, Verdana;
 }
-.time #podcast-time {
-	width: 100%;
-	position: relative;
-	top: 19px;
-	background-color: red;
+.time {
+    width: 500px;
+}
+#podcast-time {
+    border-radius: 3px;
+    width: 100%;
+    position: relative;
+    top: 13px;
+    background-color: #f72;
+    transition: all 0.5s ease;
+    text-align: right;
+    height: 20px;
+}
+#playtime {
+    border-right: 2px solid #f95;
+    position: relative;
+    top: 20px;
+    padding: 10px 3px 2px 2px;
+    margin-right: 50%;
+    transition: all 0.3s ease;
+    color: #777;
+    font-size: 85%;
 }
 #time {
-	width: 100%;
-	position: relative;
+    color: white;
+    width: 100%;
+    position: relative;
+}
+#playing {
+    font-size: 107%;
+    display: inline-block;
+    margin: 50px 0 0 0;
+    padding: 5px 15px 7px 15px;
+    border-radius: 17px;
+    background-color: #f72; 
+    color: white;
+}
+#playing:before {
+    font: normal normal normal 14px/1 FontAwesome;
+    font-size: inherit;
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    display: inline-block;
+    margin: 0 15px 0 0;
+    content: "\f028";
+}
+#playing.done {
+    background-color: #eee;
+    color: #666;
+}
+#playing.done:before {
+    content: "\f026";
+}
+h3 {
+    font-weight: normal;
+    color: #888;
+}
+ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+li {
+    display:block;
+    cursor: pointer;
+}
+li a {
+    display: inline-block;
+    padding: 5px 22px 5px 9px;
+    text-decoration: none;
+    border-radius: 15px;
+}
+li a:hover {
+    background-color: #f4f4f4!important;
+}
+li a:hover:before {
+    color: #888;
+    content: "\f0da";
+}
+li a.default {
+    font-size: 107%;
+    color: #444;
+    background-color: #eee;
+}
+li a.default:before {
+    color: inherit!important;
+    content: "\f101"!important;
+}
+li a.external:before {
+    content: " "!important;
+    background-color:inherit!important;
+}
+li a.external:after {
+    display: inline-block;
+    font: normal normal normal 14px/1 FontAwesome;
+    font-size: inherit;
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    content: "\f08e"!important;
+    padding-left: 7px;
+}
+li a:before {
+    width: 15px;
+    display: inline-block;
+    font: normal normal normal 14px/1 FontAwesome;
+    font-size: inherit;
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    padding-right: 5px;
+    padding-left: 3px;
+    content: " ";
+}
+input:focus{
+    outline: none;
+}
+input[type=range] {
+    -webkit-appearance: none;
+    background-color: rgba( 220,220,220, 0.5 );
+    height: 2px;
+    width:200px;
+}
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    background-color: red;
+    width: 20px;
+    height: 20px;
+}
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    background-color: #777;
+    width: 6px;
+    height: 25px;
+    border-radius: 2px;
 }
 </style>
 <script type="text/javascript">
 var podcast;
 function numCmp(a,b) {
-	if ( a < b ) { return 1; }
-	else if ( b === a ) { return 0; }
-	else { return -1; }
+    if ( a < b ) { return 1; }
+    else if ( b === a ) { return 0; }
+    else { return -1; }
 };
 function Audio() {
-	var self = this;
-	var timer, listener;
-	if ( ! ( this instanceof Audio ) ) {
-		return new Audio( );
-	}
-	function notify() {
-		self.pause();
-		if ( listener ) {
-			listener();
-		}
-	}
-	self.src = undefined;
-	self.play = function( ) {
-		var fragment = podcast && podcast.fragmentIndex[ self.src ];
-		if ( !fragment ) {
-			return;
-		}
-		if ( !timer ) {
-			timer = window.setTimeout( notify, fragment.length * 100 );
-		}
-	}
-	self.pause = function() {
-		if ( timer ) {
-			window.clearTimeout( timer );
-			timer = undefined;
-		}
-	}
-	self.addEventListener = function( e, l ) {
-		listener = l;
-	}
-	return self;
+    var self = this;
+    var timer, listener;
+    if ( ! ( this instanceof Audio ) ) {
+        return new Audio( );
+    }
+    function notify() {
+        self.pause();
+        if ( listener ) {
+            listener();
+        }
+    }
+    self.src = undefined;
+    self.play = function( ) {
+        var fragment = podcast && podcast.fragmentIndex[ self.src ];
+        if ( !fragment ) {
+            return;
+        }
+        if ( !timer ) {
+            timer = window.setTimeout( notify, fragment.length * 100 );
+        }
+    }
+    self.pause = function() {
+        if ( timer ) {
+            window.clearTimeout( timer );
+            timer = undefined;
+        }
+    }
+    self.addEventListener = function( e, l ) {
+        listener = l;
+    }
+    return self;
 }
 
 function argNames( fn ) {
-	return fn.toString().split( /\(\s*/ )[ 1 ].split( /\s*\)/ )[ 0 ].split( /\s*,\s*/g );
+    return fn.toString().split( /\(\s*/ )[ 1 ].split( /\s*\)/ )[ 0 ].split( /\s*,\s*/g );
 }
-function Fragment( audio, length, description, priority, next ) {
-	var self = this;
-	var argN = argNames( Fragment );
-	if ( ! ( this instanceof Fragment ) ) {
-		return new Fragment( audio, length, description, priority, next );
-	}
-	Array.prototype.slice.apply( arguments ).forEach( (v,i)=>self[ argN[ i ] ]=v );
-	if ( !Array.isArray( self.next ) ) {
-		if ( self.next ) {
-			self.next = [ self.next ];
-		} else {
-			self.next = [ ];
-		}
-	}
-	return self;
+function Fragment( audio, length, description, priority, next, external ) {
+    var self = this;
+    var argN = argNames( Fragment );
+    if ( ! ( this instanceof Fragment ) ) {
+        return new Fragment( audio, length, description, priority, next, external );
+    }
+    Array.prototype.slice.apply( arguments ).forEach( (v,i)=>self[ argN[ i ] ]=v );
+    if ( !Array.isArray( self.next ) ) {
+        if ( self.next ) {
+            self.next = [ self.next ];
+        } else {
+            self.next = [ ];
+        }
+    }
+    return self;
 }
 
 function sliceAt( fragmentId ) {
-	var self = this;
-	var index = self.findIndex( (e)=>{ return e.audio===fragmentId } );
-	return self.slice( index + 1 );
+    var self = this;
+    var index = self.findIndex( (e)=>{ return e.audio===fragmentId } );
+    return self.slice( index + 1 );
 }
 function Podcast( fragments, playlistChangeListener ) {
-	var self = this;
-	if ( ! ( this instanceof Podcast ) ) {
-		return new Podcast( fragments, playlistChangeListener );
-	}
-	self.fragmentIndex = { };
-	self.playlist = [ ];
-	( self.fragments = fragments.slice( ) ).forEach( (f, i)=>{
-		self.playlist[ i ]=f.audio;
-		self.fragmentIndex[f.audio]=f; } );
-	self.played = 0;
-	self._playlistChange = playlistChangeListener;
-	self.junction = self._junction.bind( self, "" );
-	self.fragments.sliceAt = sliceAt;
-	self._external = [ ];
-	return self;
+    var self = this;
+    if ( ! ( this instanceof Podcast ) ) {
+        return new Podcast( fragments, playlistChangeListener );
+    }
+    self.fragmentIndex = { };
+    self.playlist = [ ];
+    ( self.fragments = fragments.slice( ) ).forEach( (f, i)=>{
+        self.playlist[ i ]=f.audio;
+        self.fragmentIndex[f.audio]=f; } );
+    self.played = 0;
+    self._playlistChange = playlistChangeListener;
+    self.junction = self._junction.bind( self, "" );
+    self.fragments.sliceAt = sliceAt;
+    self._external = [ ];
+    return self;
 }
 Podcast.prototype.adjust = function( duration ) {
-	var self = this;
-	var priority = 0;
-	var currentLength;
-	var fragmentMap = [ ], it, f;
-	var exiting = false, src, slicing = [], sliced = [];
-	duration = duration || 0;
-	( src = self.fragments.sliceAt( self.playing() ) ).forEach( function( f, i ) {
-		priority = ( f.priority || 0 );
-		fragmentMap[ priority ] = it = ( fragmentMap[ priority ] || [ ] );
-		it.push( [ f.audio, i ] ); } );
-	currentLength = self.length( false, ( src = src.map( (f)=>{ return f.audio } ) ) );
-	if ( duration >= currentLength ) {
-		;
-	} else {
-		priority = fragmentMap.length - 1;
-		while( priority > 0 ) {
-			it = fragmentMap[ priority ] || [ ];
-			while( f = it.pop() ) {
-				currentLength -= ( self.fragmentIndex[ f[ 0 ] || "_" ] || [ ] ).length;
-				slicing.push( f[ 1 ] );
-				if ( duration >= currentLength ) {
-					exiting = true;
-					break;
-				}
-			}
-			if ( exiting ) {
-				break;
-			}
-			priority--;
-		}
-	}
-	if ( slicing.length && self._playlistChange ) {
-		( slicing.slice().sort( numCmp ) ).forEach( ( i )=>sliced.unshift( src.splice( i, 1 )[ 0 ] ) );
-	}
-	if ( ( f = self.playlist.join( "," ) ) !== src.join( "," ) ) {
-		self.playlist = src;
-		if ( self.player && !f ) {
-			self.player._continue( );
-		}
-		self._playlistChange( self, self.playlist, sliced, slicing );
-	}
+    var self = this;
+    var priority = 0;
+    var currentLength;
+    var fragmentMap = [ ], it, f;
+    var exiting = false, src, slicing = [], sliced = [];
+    duration = duration || 0;
+    ( src = self.fragments.sliceAt( self.playing() ) ).forEach( function( f, i ) {
+        priority = ( f.priority || 0 );
+        fragmentMap[ priority ] = it = ( fragmentMap[ priority ] || [ ] );
+        it.push( [ f.audio, i ] ); } );
+    currentLength = self.length( false, ( src = src.map( (f)=>{ return f.audio } ) ) );
+    if ( duration >= currentLength ) {
+        ;
+    } else {
+        priority = fragmentMap.length - 1;
+        while( priority > 0 ) {
+            it = fragmentMap[ priority ] || [ ];
+            while( f = it.pop() ) {
+                currentLength -= ( self.fragmentIndex[ f[ 0 ] || "_" ] || [ ] ).length;
+                slicing.push( f[ 1 ] );
+                if ( duration >= currentLength ) {
+                    exiting = true;
+                    break;
+                }
+            }
+            if ( exiting ) {
+                break;
+            }
+            priority--;
+        }
+    }
+    if ( slicing.length && self._playlistChange ) {
+        ( slicing.slice().sort( numCmp ) ).forEach( ( i )=>sliced.unshift( src.splice( i, 1 )[ 0 ] ) );
+    }
+    if ( ( f = self.playlist.join( "," ) ) !== src.join( "," ) ) {
+        self.playlist = src;
+        if ( self.player && !f ) {
+            self.player._continue( );
+        }
+        self._playlistChange( self, self.playlist, sliced, slicing );
+    }
 }
 Podcast.prototype._junction = function( fragmentId ) {
-	var self = this;
-	var next = ( ( self.fragmentIndex[ fragmentId ] || { } ).next || [ ] ).slice( );
-	var additional = self.playlist[ 0 ];
-	var def = 0;
-	if ( additional && ( def = next.indexOf( additional ) ) === -1 ) {
-		def = 0;
-		next.unshift( additional );
-	}
-	return next;
+    var self = this;
+    var next = ( ( self.fragmentIndex[ fragmentId ] || { } ).next || [ ] ).slice( );
+    var additional = self.playlist[ 0 ];
+    var def = 0;
+    if ( additional && ( def = next.indexOf( additional ) ) === -1 ) {
+        def = 0;
+        next.unshift( additional );
+    }
+    next[ "def" ] = next[ def ];
+    return next;
 }
 Podcast.prototype.playing = function( next ) {
-	var self = this;
-	return self.player.playing( next );
+    var self = this;
+    return self.player.playing( next );
 }
 Podcast.prototype.length = function( remaining, source ) {
-	var l = 0, self = this;
-	( source || self.playlist ).forEach( ( f )=>( l+= ( ( f && ( f = self.fragmentIndex[ f ] ) &&  f.length ) || 0 )  ) );
-	if ( !remaining ) {
-		l += self.played; 
-	}
-	return l;
+    var l = 0, self = this;
+    ( source || self.playlist ).forEach( ( f )=>( l+= ( ( f && ( f = self.fragmentIndex[ f ] ) &&  f.length ) || 0 )  ) );
+    if ( !remaining ) {
+        l += self.played; 
+    }
+    return l;
 }
 Podcast.prototype._collectExternal = function( next ) {
-	var self = this;
-	( next || [ ] ).forEach( ( f )=> {
-		if ( ( !self.fragmentIndex[ f ] ) && ( self._external.indexOf( f ) === -1 ) ) {
-			self._external.push( f );
-		}
-	} )
+    var self = this;
+    ( next || [ ] ).forEach( ( f )=> {
+        if ( ( !self.fragmentIndex[ f ] ) && ( self._external.indexOf( f ) === -1 ) ) {
+            self._external.push( f );
+        }
+    } )
 }
 Podcast.prototype.external = function() {
-	return this._external.slice();
+    return this._external.slice();
 }
 
 function Player( podcast, autoplay, junctionListener ) {
-	var self = this;
-	if ( ! ( this instanceof Player ) ) {
-		return new Player( podcast, autoplay, junctionListener );
-	}
-	if ( typeof autoplay === "function" ){
-		junctionListener = autoplay;
-		autoplay = false;
-	}
-	function increment( playerType ) {
-		self[ playerType ] += 1;
-		if ( self[ playerType ] >= self._players.length ) {
-			self[ playerType ] = 0;
-		}
-	}
-	function continuePlay( beginning ) {
-		var podcast = self._podcast;
-		var currentPlayer, next;
-		self._players[ self._active ].pause();
-		if ( self.ending && ( self.ending = !self.preload( ) ) ) {
-			if ( junctionListener ) {
-				junctionListener( self, undefined, podcast.external() );
-			}
-			return;
-		}
-		if ( !beginning ) {
-			increment( "_active" );
-		}
-		podcast.played += ( podcast.fragmentIndex[ ( podcast && podcast.playlist[ 0 ] ) || "_" ] || [] ).length;
-		podcast.playlist = podcast.playlist.slice( 1 );
-		self._next = self._active;
-		increment( "_next" );
-		( currentPlayer = self._players[ self._active ] ).play();
-		if ( !self.ending && !self.preload( ) ) {
-			self.ending = 1;
-		}
-		self._podcast._collectExternal(
-			next = ( self._podcast.junction =
-					 self._podcast._junction.bind(
-						self._podcast, currentPlayer.fragmentId ) )( ) );
-		if ( junctionListener ) {
-			junctionListener( self,
-				currentPlayer.fragmentId, next );
-		}
-	}
-	self._continue = continuePlay;
-	self._players = [ Audio(), Audio() ]; 
-		// [ document.getElementById( "player1" ), document.getElementById( "player2" ) ];
-	self._players.forEach( (a)=>{
-		a.volume = 0;
-		a.addEventListener( "ended", continuePlay ) } );
-	self._active = 0;
-	self._next = 1;
-	self._podcast = podcast;
-	podcast.player = self;
-	self.preload( true );
-	continuePlay( true );
-	if (!autoplay) {
-		self.pause();
-	}
-	return self;
+    var self = this;
+    if ( ! ( this instanceof Player ) ) {
+        return new Player( podcast, autoplay, junctionListener );
+    }
+    if ( typeof autoplay === "function" ){
+        junctionListener = autoplay;
+        autoplay = false;
+    }
+    function increment( playerType ) {
+        self[ playerType ] += 1;
+        if ( self[ playerType ] >= self._players.length ) {
+            self[ playerType ] = 0;
+        }
+    }
+    function continuePlay( beginning ) {
+        var podcast = self.podcast;
+        var currentPlayer, next;
+        self._players[ self._active ].pause();
+        if ( self.ending && ( self.ending = !self.preload( ) ) ) {
+            if ( junctionListener ) {
+                junctionListener( self, undefined, podcast.external() );
+            }
+            return;
+        }
+        if ( !beginning ) {
+            increment( "_active" );
+        }
+        podcast.played += ( podcast.fragmentIndex[ ( podcast && podcast.playlist[ 0 ] ) || "_" ] || [] ).length;
+        podcast.playlist = podcast.playlist.slice( 1 );
+        self._next = self._active;
+        increment( "_next" );
+        ( currentPlayer = self._players[ self._active ] ).play();
+        if ( !self.ending && !self.preload( ) ) {
+            self.ending = 1;
+        }
+        self.podcast._collectExternal(
+            next = ( self.podcast.junction =
+                     self.podcast._junction.bind(
+                        self.podcast, currentPlayer.fragmentId ) )( ) );
+        if ( junctionListener ) {
+            junctionListener( self,
+                currentPlayer.fragmentId, next );
+        }
+    }
+    self._continue = continuePlay;
+    self._players = [ Audio(), Audio() ]; 
+        // [ document.getElementById( "player1" ), document.getElementById( "player2" ) ];
+    self._players.forEach( (a)=>{
+        a.volume = 0;
+        a.addEventListener( "ended", continuePlay ) } );
+    self._active = 0;
+    self._next = 1;
+    self.podcast = podcast;
+    podcast.player = self;
+    self.preload( true );
+    continuePlay( true );
+    if (!autoplay) {
+        self.pause();
+    }
+    return self;
 }
 Player.prototype.pause = function( ) {
-	this._players[ this._active ].pause();
+    this._players[ this._active ].pause();
 }
 Player.prototype.play = function( ) {
-	this._players[ this._active ].play();
+    this._players[ this._active ].play();
 }
 Player.prototype.preload = function( current ) {
-	var self = this;
-	var podcast = self._podcast;
-	var fragmentId = podcast.playlist[ 0 ];
-	var fragment = fragmentId && podcast.fragmentIndex[ fragmentId ];
-	var player;
-	if ( !fragment ) {
-		return false;
-	} else {
-		( player = self._players[ current ? self._active : self._next ] ).src = fragment.audio;
-		player.fragmentId = fragment.audio;
-	}
-	return true;
+    var self = this;
+    var podcast = self.podcast;
+    var fragmentId = podcast.playlist[ 0 ];
+    var fragment = fragmentId && podcast.fragmentIndex[ fragmentId ];
+    var player;
+    if ( !fragment ) {
+        return false;
+    } else {
+        ( player = self._players[ current ? self._active : self._next ] ).src = fragment.audio;
+        player.fragmentId = fragment.audio;
+    }
+    return true;
 }
 Player.prototype.playing = function( next ) {
-	var self = this;
-	return self._players[ !next ? self._active : self._next ].fragmentId;
+    var self = this;
+    return self._players[ !next ? self._active : self._next ].fragmentId;
 }
 
 function info( el, self ) {
-	document.getElementById( el ).innerText = 
-		"" + podcast.length( true ) + "\r\n" +
-		"" + podcast.length( false ) + "\r\n" +
-		JSON.stringify( Array.prototype.slice.apply( arguments ).slice( 2 ) );
-	if ( el === "playlist" ) {
-		document.getElementById( "podcast-time" ).style.width =
-			"" + ( self.length( false ) /
-					self.length(
-						true, 
-						self.fragments.map( 
-							( f )=>{ return f.audio; } ) ) * 100 || 0 ) + "%";
-		info( "info", self, self.playing(), self.junction() );
-	}
+    document.getElementById( el ).innerText = 
+        "" + podcast.length( true ) + "\r\n" +
+        "" + podcast.length( false ) + "\r\n" +
+        JSON.stringify( Array.prototype.slice.apply( arguments ).slice( 2 ) );
+    if ( el === "playlist" ) {
+        document.getElementById( "podcast-time" ).style.width =
+            "" + ( self.length( false ) /
+                    self.length(
+                        true, 
+                        self.fragments.map( 
+                            ( f )=>{ return f.audio; } ) ) * 100 || 0 ) + "%";
+        info( "info", self, self.playing(), self.junction() );
+    }
 }
 
-podcast = Podcast( [ 
-	Fragment( "a", 22.2, "the entry", 0, [ "b", "c" ] ),
-	Fragment( "b", 30.34, "post entry default - optional", 1, [ "a", "c", "z" ] ),
-	Fragment( "c", 20.34, "post entry default - mandatory", 0, [ "d", "y" ] ),
-	Fragment( "d", 20.34, "post second default - optional 1", 1, [ "x", "e" ] ),
-	Fragment( "e", 20.34, "post second default - optional 2", 2, [ "f" ] ) ],
-	info.bind( undefined, "playlist" ) );
+function onPlaylist( podcast ) {
+    var self = podcast;
+    document.getElementById( "podcast-time" ).style.width =
+    "" + ( self.length( false ) /
+            self.length(
+                true, 
+                self.fragments.map( 
+                    ( f )=>{ return f.audio; } ) ) * 100 || 0 ) + "%";
+    onFragment( self.player, self.playing(), self.junction() );
+}
+
+function onFragment( player, current, junction ) {
+    var podcast = player.podcast;
+    var d = ( index[ current ] || {} ).description;
+    document.getElementById("playing").innerText = d || "...";
+    document.getElementById("playing").className = !d ? "done": "";
+    var ul = document.getElementById("junction");
+    ul.innerHTML = "";
+    ( junction || [] ).map( (j)=> {
+        var li = document.createElement( "LI" );
+        var f, a = document.createElement( "A" );
+        a.innerText = ( f = ( index[ j ] || {} ) ).description;
+        if ( junction.def === f.audio ) {
+            a.className += " default";
+        }
+        if ( f.external ) {
+            a.className += " external";
+        }
+        li.appendChild( a );
+        ul.appendChild( li );
+    })
+
+}
+
+var fragments = [ 
+    Fragment( "a", 22.2, "the entry", 0, [ "b", "c" ] ),
+    Fragment( "b", 30.34, "post entry default - optional", 1, [ "a", "c", "z" ] ),
+    Fragment( "c", 20.34, "post entry default - mandatory", 0, [ "d", "y" ] ),
+    Fragment( "d", 20.34, "post second default - optional 1", 1, [ "e", "x" ] ),
+    Fragment( "e", 20.34, "post second default - optional 2", 2, [ "f" ] ) ];
+
+var eFragments = [
+    Fragment( "z", 22.2,  "Hotel Volk", 0, [], true ),
+    Fragment( "y", 30.34, "Radiodays Europe hack", 0, [], true ),
+    Fragment( "x", 20.34, "Book your Volk room now", 0, [], true ),
+    Fragment( "f", 20.34, "Join the Radiodays Europe Hack event", 0, [], true ) ];
+
+var index = { };
+[ fragments, eFragments ].map( (ar)=>ar.map( (f)=>index[f.audio]=f ) );
+
+podcast = Podcast( fragments, onPlaylist );
 
 var player;
 function updateUI() {
-	var time = document.getElementById( "time" )
-	time.value = time.max = Math.ceil( podcast.length() );
-	player = Player( podcast, info.bind( undefined, "info" ) );
-	player.play();
+    var time = document.getElementById( "time" )
+    time.value = time.max = Math.ceil( podcast.length() );
+    player = Player( podcast, onFragment );
+    player.play();
 }
 
 </script>
+<script src="https://use.fontawesome.com/f1c270525a.js"></script>
 </head>
 <body onload="updateUI()">
-	<div class="time">
-		<div id="podcast-time">&nbsp;</div>
-		<input type="range" id="time" onchange="podcast.adjust(this.value)" step="1" min="0" max="1" value="0">
-	</div>
-	<pre id="info">
-	</pre>
-	<pre id="playlist">
-	</pre>
-	<audio id="player1"></audio>
-	<audio id="player2"></audio>
+    <div class="time">
+        <div id="podcast-time"><span id="playtime">0:00</span></div>
+        <input type="range" id="time" onchange="podcast.adjust(this.value)" step="1" min="0" max="1" value="0">
+    </div>
+    <div id="playing"></div>
+    <h3>what's next:</h3>
+    <ul id="junction">
+    </ul>
+    <pre id="info">
+    </pre>
+    <pre id="playlist">
+    </pre>
 </body>
 </html>
